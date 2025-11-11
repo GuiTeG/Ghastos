@@ -1,0 +1,27 @@
+# Node / Next
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Env & credenciais
+.env
+.env.*
+!.env.example
+credentials/
+
+# Logs / OS / IDE
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+debug.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
