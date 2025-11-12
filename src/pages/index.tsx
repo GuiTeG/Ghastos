@@ -21,18 +21,28 @@ type Account = { id: number; name: string; type: string };
 
 const BRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+/* Componente Field */
+function Field({ label, children, grow }: { label: string; children: React.ReactNode; grow?: boolean }) {
+  return (
+    <div style={{ minWidth: 160, ...(grow ? { flex: 1 } : {}) }}>
+      <label style={s.label}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
 export default function Home() {
-  // tab: dashboard | lanc | contas
+  // Tab ativa: 'DASH', 'LANC', 'CONTAS'
   const [tab, setTab] = useState<'DASH' | 'LANC' | 'CONTAS'>('DASH');
 
-  // dados
+  // Dados do sistema
   const [txs, setTxs] = useState<Tx[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // form lançamento
+  // Formulário de lançamento
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     description: '',
@@ -43,10 +53,10 @@ export default function Home() {
   });
   const descRef = useRef<HTMLInputElement>(null);
 
-  // form conta
+  // Formulário de conta
   const [accForm, setAccForm] = useState({ name: '', type: 'Conta Corrente' });
 
-  // filtros
+  // Filtros de transações
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -62,43 +72,7 @@ export default function Home() {
 
   useEffect(() => { loadTx(); loadAcc(); const id = setInterval(loadTx, 8000); return () => clearInterval(id); }, []);
 
-  // criar lançamento
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!form.description || form.amount === '' || Number(form.amount) === 0) { setToast('Preencha descrição e valor.'); return; }
-    setPosting(true);
-    const body = { ...form, amount: Number(String(form.amount).replace(/\./g, '').replace(',', '.')) };
-    const res = await fetch('/api/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    setPosting(false);
-    if (!res.ok) return setToast('Erro ao salvar.');
-    setToast('Lançamento adicionado!'); setForm(f => ({ ...f, description: '', amount: '' })); descRef.current?.focus(); loadTx();
-  };
-
-  // deletar lançamento
-  const delTx = async (id: number) => {
-    if (!confirm('Excluir este lançamento?')) return;
-    await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-    setToast('Excluído.'); loadTx();
-  };
-
-  // criar conta
-  const submitAcc = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!accForm.name.trim()) return setToast('Informe um nome para a conta.');
-    const r = await fetch('/api/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(accForm) });
-    if (!r.ok) return setToast('Erro ao criar conta.');
-    setAccForm({ name: '', type: 'Conta Corrente' }); setToast('Conta criada!'); loadAcc();
-  };
-
-  // deletar conta
-  const delAcc = async (id: number) => {
-    if (!confirm('Excluir conta? (Se houver lançamentos vinculados, não será possível)')) return;
-    const r = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
-    if (!r.ok) { setToast('Não foi possível excluir esta conta.'); return; }
-    setToast('Conta excluída.'); loadAcc();
-  };
-
-  // dataset filtrado
+  // Dataset filtrado
   const filtered = useMemo(() => {
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 1);
@@ -113,7 +87,67 @@ export default function Home() {
   const expense = filtered.filter((t) => t.type === 'EXPENSE').reduce((a, b) => a + Number(b.amount), 0);
   const balance = income + expense;
 
-  // charts
+  // Evolução das Receitas e Despesas (Gráfico de Linha)
+  const lineData = useMemo(() => {
+    const daily = new Map<string, number>();
+    filtered.forEach((t) => {
+      const key = new Date(t.date).toISOString().slice(0, 10);
+      daily.set(key, (daily.get(key) || 0) + Number(t.amount));
+    });
+    const last = new Date(year, month, 0).getDate();
+    let accIncome = 0; let accExpense = 0;
+    const labels: string[] = []; 
+    const incomeValues: number[] = [];
+    const expenseValues: number[] = [];
+    for (let d = 1; d <= last; d++) {
+      const key = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dailyIncome = daily.get(key) || 0;
+      accIncome += dailyIncome > 0 ? dailyIncome : 0;
+      accExpense += dailyIncome < 0 ? Math.abs(dailyIncome) : 0;
+      labels.push(String(d).padStart(2, '0'));
+      incomeValues.push(accIncome);
+      expenseValues.push(accExpense);
+    }
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Receitas',
+          data: incomeValues,
+          borderColor: '#16a34a',
+          fill: false,
+        },
+        {
+          label: 'Despesas',
+          data: expenseValues,
+          borderColor: '#ef4444',
+          fill: false,
+        },
+      ],
+    };
+  }, [filtered, year, month]);
+
+  // Dias de Cobrança (Ciclo de Recebimento)
+  const calculateDaysToReceive = useMemo(() => {
+    const days = filtered
+      .filter((t) => t.type === 'INCOME')
+      .map((t) => {
+        const saleDate = new Date(t.date);
+        const paymentDate = new Date(t.date); // Exemplo: pode ser o momento do pagamento
+        const diffTime = paymentDate.getTime() - saleDate.getTime();
+        return diffTime / (1000 * 3600 * 24); // Diferença em dias
+      });
+    const avgDays = days.length ? days.reduce((a, b) => a + b, 0) / days.length : 0;
+    return avgDays;
+  }, [filtered]);
+
+  // Definindo os anos para o filtro
+  const years = useMemo(() => {
+    const set = new Set<number>(); txs.forEach((t) => set.add(new Date(t.date).getFullYear()));
+    return Array.from(set).sort((a, b) => b - a);
+  }, [txs]);
+
+  // PieChart Data (despesas por categoria)
   const pieData = useMemo(() => {
     const map = new Map<string, number>();
     filtered.filter((t) => t.type === 'EXPENSE').forEach((t) => {
@@ -123,26 +157,41 @@ export default function Home() {
     return { labels: Array.from(map.keys()), datasets: [{ data: Array.from(map.values()) }] };
   }, [filtered]);
 
-  const lineData = useMemo(() => {
-    const daily = new Map<string, number>();
-    filtered.forEach((t) => {
-      const key = new Date(t.date).toISOString().slice(0, 10);
-      daily.set(key, (daily.get(key) || 0) + Number(t.amount));
-    });
-    const last = new Date(year, month, 0).getDate();
-    let acc = 0; const labels: string[] = []; const values: number[] = [];
-    for (let d = 1; d <= last; d++) {
-      const key = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      acc += daily.get(key) || 0; labels.push(String(d).padStart(2, '0')); values.push(acc);
-    }
-    return { labels, datasets: [{ data: values }] };
-  }, [filtered, year, month]);
+  // Função para criar lançamentos
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!form.description || form.amount === '' || Number(form.amount) === 0) { setToast('Preencha descrição e valor.'); return; }
+    setPosting(true);
+    const body = { ...form, amount: Number(String(form.amount).replace(/\./g, '').replace(',', '.')) };
+    const res = await fetch('/api/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    setPosting(false);
+    if (!res.ok) return setToast('Erro ao salvar.');
+    setToast('Lançamento adicionado!'); setForm(f => ({ ...f, description: '', amount: '' })); descRef.current?.focus(); loadTx();
+  };
 
-  // anos distintos dos dados
-  const years = useMemo(() => {
-    const set = new Set<number>(); txs.forEach((t) => set.add(new Date(t.date).getFullYear()));
-    return Array.from(set).sort((a, b) => b - a);
-  }, [txs]);
+  // Função para deletar lançamentos
+  const delTx = async (id: number) => {
+    if (!confirm('Excluir este lançamento?')) return;
+    await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+    setToast('Excluído.'); loadTx();
+  };
+
+  // Função para criar contas
+  const submitAcc = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!accForm.name.trim()) return setToast('Informe um nome para a conta.');
+    const r = await fetch('/api/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(accForm) });
+    if (!r.ok) return setToast('Erro ao criar conta.');
+    setAccForm({ name: '', type: 'Conta Corrente' }); setToast('Conta criada!'); loadAcc();
+  };
+
+  // Função para deletar contas
+  const delAcc = async (id: number) => {
+    if (!confirm('Excluir conta? (Se houver lançamentos vinculados, não será possível)')) return;
+    const r = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+    if (!r.ok) { setToast('Não foi possível excluir esta conta.'); return; }
+    setToast('Conta excluída.'); loadAcc();
+  };
 
   return (
     <main style={s.page}>
@@ -157,7 +206,7 @@ export default function Home() {
         <div style={{ opacity: .6, fontSize: 12 }}>{txs.length} lançamentos</div>
       </nav>
 
-      {/* FILTROS (presentes em Dash e Lançamentos) */}
+      {/* FILTROS */}
       {(tab === 'DASH' || tab === 'LANC') && (
         <section style={{ ...s.card, padding: 12, marginBottom: 12 }}>
           <div style={s.filters}>
@@ -189,28 +238,29 @@ export default function Home() {
         </section>
       )}
 
-      {/* DASHBOARD */}
+      {/* Dash */}
       {tab === 'DASH' && (
         <>
           <section style={s.cardsGrid}>
             <Stat title="Receitas" value={income} />
             <Stat title="Despesas" value={expense} negative />
             <Stat title="Saldo" value={balance} bold />
+            <Stat title="Dias de Cobrança" value={calculateDaysToReceive} />
           </section>
           <section style={s.chartsGrid}>
             <div style={s.card}>
-              <h3 style={s.h3}>Gastos por categoria</h3>
-              {pieData.labels?.length ? <PieChart data={pieData} /> : <Empty>Sem dados de despesa no período.</Empty>}
+              <h3 style={s.h3}>Evolução das Receitas e Despesas</h3>
+              {lineData.labels?.length ? <LineChart data={lineData} /> : <Empty>Sem dados de evolução no período.</Empty>}
             </div>
             <div style={s.card}>
-              <h3 style={s.h3}>Saldo acumulado (dia)</h3>
-              <LineChart data={lineData} />
+              <h3 style={s.h3}>Gastos por categoria</h3>
+              {pieData.labels?.length ? <PieChart data={pieData} /> : <Empty>Sem dados de despesa no período.</Empty>}
             </div>
           </section>
         </>
       )}
 
-      {/* LANÇAMENTOS */}
+      {/* Lançamentos */}
       {tab === 'LANC' && (
         <>
           <section style={s.cardsGrid}>
@@ -219,19 +269,16 @@ export default function Home() {
             <Stat title="Saldo" value={balance} bold />
           </section>
 
+          {/* Formulário para adicionar lançamentos */}
           <form onSubmit={submit} style={s.form}>
             <Field label="Data">
-              <input type="date" value={form.date} style={s.input}
-                     onChange={(e) => setForm({ ...form, date: e.target.value })} />
+              <input type="date" value={form.date} style={s.input} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </Field>
             <Field label="Descrição" grow>
-              <input ref={descRef} value={form.description} style={s.input}
-                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                     onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget.form as any)?.requestSubmit()} />
+              <input ref={descRef} value={form.description} style={s.input} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </Field>
             <Field label="Valor (R$)">
-              <input inputMode="decimal" value={form.amount} placeholder="0,00" style={s.input}
-                     onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d,.-]/g, '').replace(/\.(?=.*\.)/g, '') })}/>
+              <input inputMode="decimal" value={form.amount} placeholder="0,00" style={s.input} onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d,.-]/g, '').replace(/\.(?=.*\.)/g, '') })} />
             </Field>
             <Field label="Tipo">
               <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as any })} style={s.input}>
@@ -239,16 +286,17 @@ export default function Home() {
               </select>
             </Field>
             <Field label="Conta">
-              <input value={form.account} style={s.input} onChange={(e) => setForm({ ...form, account: e.target.value })}/>
+              <input value={form.account} style={s.input} onChange={(e) => setForm({ ...form, account: e.target.value })} />
             </Field>
             <Field label="Categoria">
-              <input value={form.category} style={s.input} onChange={(e) => setForm({ ...form, category: e.target.value })}/>
+              <input value={form.category} style={s.input} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             </Field>
             <div style={{ gridColumn: '1 / -1', textAlign: 'right' }}>
               <button disabled={posting} style={s.button}>{posting ? 'Adicionando…' : 'Adicionar'}</button>
             </div>
           </form>
 
+          {/* Lista de lançamentos */}
           {loading ? (
             <div style={{ padding: 12 }}>Carregando…</div>
           ) : (
@@ -289,7 +337,7 @@ export default function Home() {
             <h3 style={s.h3}>Nova conta</h3>
             <form onSubmit={submitAcc} style={{ display:'flex', gap:8, alignItems:'end', flexWrap:'wrap' }}>
               <Field label="Nome" grow>
-                <input value={accForm.name} onChange={(e) => setAccForm(a => ({ ...a, name: e.target.value }))} style={s.input}/>
+                <input value={accForm.name} onChange={(e) => setAccForm(a => ({ ...a, name: e.target.value }))} style={s.input} />
               </Field>
               <Field label="Tipo">
                 <select value={accForm.type} onChange={(e) => setAccForm(a => ({ ...a, type: e.target.value }))} style={s.input}>
@@ -340,6 +388,7 @@ function Tab({ label, active, onClick }: { label: string; active?: boolean; onCl
     </button>
   );
 }
+
 function Stat({ title, value, negative, bold }: { title: string; value: number; negative?: boolean; bold?: boolean }) {
   const color = negative ? '#ef4444' : value >= 0 ? '#16a34a' : '#ef4444';
   return (
@@ -349,33 +398,28 @@ function Stat({ title, value, negative, bold }: { title: string; value: number; 
     </div>
   );
 }
-function Field({ label, children, grow }: { label: string; children: React.ReactNode; grow?: boolean }) {
-  return (
-    <div style={{ minWidth: 160, ...(grow ? { flex: 1 } : {}) }}>
-      <label style={s.label}>{label}</label>
-      {children}
-    </div>
-  );
-}
+
 function Empty({ children }: { children: React.ReactNode }) {
   return <div style={{ padding: 8, color: '#667085' }}>{children}</div>;
 }
 
 /* styles */
 const s: Record<string, React.CSSProperties> = {
-  page: { padding: 24, maxWidth: 1100, margin: '0 auto', fontFamily: 'Inter, system-ui, Segoe UI, Roboto, Arial', background: '#f8fafc' },
-  nav: { display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 12 },
-  tabs: { display:'flex', gap:8 },
-  card: { border: '1px solid #eee', borderRadius: 16, padding: 16, background: '#fff', boxShadow: '0 1px 0 rgba(0,0,0,.03)' },
-  cardsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:12, marginBottom:12 },
-  chartsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:12, margin:'12px 0' },
-  form: { display:'flex', gap:8, flexWrap:'wrap', alignItems:'end', margin:'12px 0', border:'1px solid #eee', borderRadius:16, padding:12, background:'#fff' },
-  filters: { display:'flex', gap:8, flexWrap:'wrap' },
-  input: { border:'1px solid #e5e7eb', borderRadius:10, padding:'8px 10px', outline:'none', width:'100%', background:'#fff' },
-  button: { background:'#111827', color:'#fff', border:0, borderRadius:10, padding:'10px 16px', cursor:'pointer' },
-  btnGhost: { background:'#fff', border:'1px solid #e5e7eb', padding:'6px 10px', borderRadius:10, cursor:'pointer' },
-  table: { width:'100%', borderCollapse:'collapse' },
-  h3: { margin:'0 0 8px 0' },
-  label: { display:'block', fontSize:12, color:'#667085', marginBottom:4 },
-  toast: { position:'fixed', right:16, bottom:16, background:'#111827', color:'#fff', padding:'10px 14px', borderRadius:10, animation:'fadeout 2.2s forwards' },
+  page: { padding: 24, maxWidth: 1200, margin: '0 auto', fontFamily: 'Inter, system-ui, Segoe UI, Roboto, Arial', background: '#f4f7fb' },
+  nav: { display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 16, padding: '0 24px', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,.1)', borderRadius: 12 },
+  tabs: { display:'flex', gap:12 },
+  card: { border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, background: '#fff', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', transition: 'box-shadow 0.3s ease' },
+  cardsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:20, marginBottom:20 },
+  chartsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:20, marginTop:16 },
+  form: { display:'flex', gap:16, flexWrap:'wrap', alignItems:'end', margin:'12px 0', border:'1px solid #e5e7eb', borderRadius:16, padding:20, background:'#fff' },
+  filters: { display:'flex', gap:16, flexWrap:'wrap', justifyContent:'space-between' },
+  input: { border:'1px solid #e5e7eb', borderRadius:10, padding:'10px 12px', width:'100%', fontSize:14, outline:'none', background:'#fff', boxSizing:'border-box' },
+  button: { background:'#111827', color:'#fff', border:0, borderRadius:10, padding:'12px 24px', cursor:'pointer', fontSize:16, transition: 'background 0.3s ease' },
+  btnGhost: { background:'#fff', border:'1px solid #e5e7eb', padding:'8px 16px', borderRadius:10, cursor:'pointer', transition: 'background 0.3s ease' },
+  table: { width:'100%', borderCollapse:'collapse', boxSizing:'border-box' },
+  h3: { margin:'0 0 16px 0', fontWeight:600, color:'#333' },
+  label: { display:'block', fontSize:14, color:'#667085', marginBottom:6 },
+  toast: { position:'fixed', right:20, bottom:20, background:'#16a34a', color:'#fff', padding:'12px 20px', borderRadius:10, animation:'fadeout 2.2s forwards', fontWeight:600 },
+  tabActive: { padding: '8px 16px', borderRadius: 12, background: '#16a34a', color: '#fff' },
+  tabInactive: { padding: '8px 16px', borderRadius: 12, background: '#f3f4f6', color: '#333' },
 };

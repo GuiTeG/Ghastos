@@ -35,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const [y, m, d] = date.split('-').map(Number);
   const whenUTC = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
 
+  // Criação ou atualização das categorias e contas no banco de dados
   const [cat, acc] = await Promise.all([
     prisma.category.upsert({
       where: { name: category },
@@ -48,6 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }),
   ]);
 
+  // Criação do lançamento
   const tx = await prisma.transaction.create({
     data: {
       date: whenUTC,
@@ -59,9 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     },
   });
 
-  // grava também no Google Sheets (ID na coluna A)
+  // Tentativa de gravar os dados no Google Sheets
   try {
-    // Suporta os dois modos: arquivo JSON OU email/key
     const hasJson = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
     const hasKeyPair = !!(process.env.GOOGLE_SA_EMAIL && process.env.GOOGLE_SA_KEY);
     if (process.env.SHEETS_ID && (hasJson || hasKeyPair)) {
@@ -83,8 +84,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } catch (e) {
     console.error('Sheets append error:', e);
-    // segue mesmo que a planilha falhe — dado principal fica no DB
+    // Se o erro ocorrer no Google Sheets, ele será apenas logado e o processo de transação continuará
   }
 
+  // Resposta de sucesso
   return res.status(201).json({ ok: true, id: tx.id });
 }

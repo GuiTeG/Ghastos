@@ -24,15 +24,17 @@ model Account {
 }
 
 model Transaction {
-  id         Int       @id @default(autoincrement())
-  date       DateTime
-  description String
-  amount     Decimal
-  type       String    // INCOME | EXPENSE
-  accountId  Int
-  categoryId Int
-  account    Account   @relation(fields: [accountId], references: [id])
-  category   Category  @relation(fields: [categoryId], references: [id])
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id           Int       @id @default(autoincrement())
+  date         DateTime
+  description  String
+  amount       Float
+  type         String
+  accountId    Int
+  categoryId   Int
+  dueDate      DateTime? // Data de vencimento (opcional)
+  installments Int?      // Número de parcelas (opcional)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  category     Category  @relation(fields: [categoryId], references: [id])
+  account      Account   @relation(fields: [accountId], references: [id])
 }
