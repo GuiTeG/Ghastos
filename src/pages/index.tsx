@@ -153,17 +153,21 @@ const TAB_LABELS: Record<'DASH' | 'LANC' | 'CONTAS', string> = {
 };
 
 export default function Home() {
-  // Tab ativa: 'DASH', 'LANC', 'CONTAS'
+  // Tab ativa
   const [tab, setTab] = useState<'DASH' | 'LANC' | 'CONTAS'>('DASH');
 
-  // Dados do sistema
+  // Dados
   const [txs, setTxs] = useState<Tx[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Formulário de lançamento
+  // Layout responsivo
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Form lançamento
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     description: '',
@@ -174,10 +178,10 @@ export default function Home() {
   });
   const descRef = useRef<HTMLInputElement>(null);
 
-  // Formulário de conta
+  // Form conta
   const [accForm, setAccForm] = useState({ name: '', type: 'Conta Corrente' });
 
-  // Filtros de transações
+  // Filtros
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -202,7 +206,28 @@ export default function Home() {
     return () => clearInterval(id);
   }, []);
 
-  // Dataset filtrado (apenas mês/ano selecionados)
+  // Responsivo: detectar mobile
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 768px)');
+
+    const handleChange = (event: any) => {
+      const matches = event.matches;
+      setIsMobile(matches);
+      if (!matches) setSidebarOpen(false);
+    };
+
+    setIsMobile(mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', handleChange);
+    else mq.addListener(handleChange);
+
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handleChange);
+      else mq.removeListener(handleChange);
+    };
+  }, []);
+
+  // Dataset filtrado (mês/ano)
   const filtered = useMemo(() => {
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 1);
@@ -242,7 +267,7 @@ export default function Home() {
   const daysRemaining = Math.max(daysInMonth - daysElapsed, 0);
   const projectedEndBalance = balance + netPerDay * daysRemaining;
 
-  // Comparativo com mês anterior (receitas e despesas)
+  // Comparativo mês anterior
   const prevComparison = useMemo(() => {
     if (!txs.length) return null;
     const prevMonth = month === 1 ? 12 : month - 1;
@@ -285,14 +310,13 @@ export default function Home() {
     };
   }, [txs, year, month, income, totalExpenseAbs]);
 
-  // Saldo diário acumulado (linha / área)
+  // Saldo diário acumulado
   const saldoLineData = useMemo(() => {
     if (!txs.length) return { labels: [], datasets: [] as any[] };
 
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 1);
 
-    // saldo anterior ao primeiro dia do mês
     const saldoAnterior = txs
       .filter(t => new Date(t.date) < start)
       .reduce((a, b) => a + Number(b.amount), 0);
@@ -335,7 +359,7 @@ export default function Home() {
     };
   }, [txs, year, month]);
 
-  // Receitas x Despesas dos últimos 6 meses (bar)
+  // Receitas x Despesas últimos 6 meses
   const monthlyBarData = useMemo(() => {
     if (!txs.length) return { labels: [], datasets: [] as any[] };
 
@@ -389,7 +413,7 @@ export default function Home() {
     };
   }, [txs, year, month]);
 
-  // Top categorias (barra horizontal) - mês atual
+  // Top categorias (mês)
   const topCategoriesData = useMemo(() => {
     const map = new Map<string, number>();
     filtered
@@ -413,7 +437,7 @@ export default function Home() {
     };
   }, [filtered]);
 
-  // Top locais (descrição) onde mais gastou (barra horizontal) - mês atual
+  // Top locais (descrição) mês
   const topPlacesData = useMemo(() => {
     const map = new Map<string, number>();
 
@@ -438,7 +462,7 @@ export default function Home() {
     };
   }, [filtered]);
 
-  // Despesa por dia da semana (Dom..Sáb)
+  // Despesa por dia da semana
   const weekdayData = useMemo(() => {
     const labels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const sums = Array(7).fill(0);
@@ -447,7 +471,7 @@ export default function Home() {
       .filter(t => t.type === 'EXPENSE')
       .forEach(t => {
         const d = new Date(t.date);
-        const dow = d.getDay(); // 0=Dom
+        const dow = d.getDay();
         sums[dow] += Math.abs(Number(t.amount));
       });
 
@@ -463,7 +487,7 @@ export default function Home() {
     };
   }, [filtered]);
 
-  // PieChart Data (despesas por categoria) - mês atual
+  // Pizza de categorias
   const pieData = useMemo(() => {
     const map = new Map<string, number>();
     filtered
@@ -502,7 +526,7 @@ export default function Home() {
     };
   }, [filtered]);
 
-  // Destaques do mês: dia mais caro e top 3 maiores gastos (despesas)
+  // Destaques do mês
   const monthHighlights = useMemo(() => {
     const expenses = filtered.filter(t => t.type === 'EXPENSE');
     if (!expenses.length) {
@@ -512,7 +536,6 @@ export default function Home() {
       };
     }
 
-    // Soma por dia
     const byDay = new Map<string, number>();
     expenses.forEach(t => {
       const dayKey = new Date(t.date).toISOString().slice(0, 10);
@@ -529,7 +552,6 @@ export default function Home() {
       }
     });
 
-    // Top 3 maiores despesas individuais
     const topExpenses = [...expenses]
       .sort(
         (a, b) => Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)),
@@ -539,7 +561,7 @@ export default function Home() {
     return { priciestDay, topExpenses };
   }, [filtered]);
 
-  // Assinaturas / recorrentes (descrições com 3+ ocorrências em despesas)
+  // Assinaturas / gastos recorrentes
   const recurringExpenses = useMemo(() => {
     if (!txs.length) return [] as { name: string; avg: number; count: number }[];
 
@@ -548,7 +570,7 @@ export default function Home() {
       { name: string; total: number; count: number }
     >();
     const thresholdDate = new Date();
-    thresholdDate.setMonth(thresholdDate.getMonth() - 6); // últimos 6 meses
+    thresholdDate.setMonth(thresholdDate.getMonth() - 6);
 
     txs.forEach(t => {
       if (t.type !== 'EXPENSE') return;
@@ -580,14 +602,14 @@ export default function Home() {
     return arr;
   }, [txs]);
 
-  // Definindo os anos para o filtro
+  // Anos disponíveis
   const years = useMemo(() => {
     const set = new Set<number>();
     txs.forEach(t => set.add(new Date(t.date).getFullYear()));
     return Array.from(set).sort((a, b) => b - a);
   }, [txs]);
 
-  // Insights textuais do mês
+  // Insights textuais
   const mainCategoryName =
     topCategoriesData.labels && topCategoriesData.labels.length
       ? topCategoriesData.labels[0]
@@ -651,7 +673,7 @@ export default function Home() {
     );
   }
 
-  // Função para criar lançamentos
+  // Criar lançamento
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.description || form.amount === '' || Number(form.amount) === 0) {
@@ -680,7 +702,7 @@ export default function Home() {
     loadTx();
   };
 
-  // Função para deletar lançamentos
+  // Deletar lançamento
   const delTx = async (id: number) => {
     if (!confirm('Excluir este lançamento?')) return;
     await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
@@ -688,7 +710,7 @@ export default function Home() {
     loadTx();
   };
 
-  // Função para criar contas
+  // Criar conta
   const submitAcc = async (e: FormEvent) => {
     e.preventDefault();
     if (!accForm.name.trim())
@@ -704,7 +726,7 @@ export default function Home() {
     loadAcc();
   };
 
-  // Função para deletar contas
+  // Deletar conta
   const delAcc = async (id: number) => {
     if (
       !confirm(
@@ -725,60 +747,98 @@ export default function Home() {
 
   return (
     <div style={s.app}>
-      {/* Sidebar */}
-      <aside style={s.sidebar}>
-        <div style={s.logo}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>Gastos</div>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>controle financeiro</div>
-        </div>
-        <nav style={s.menu}>
-          <MenuItem
-            label="Dashboard"
-            icon="📊"
-            active={tab === 'DASH'}
-            onClick={() => setTab('DASH')}
-          />
-          <MenuItem
-            label="Lançamentos"
-            icon="✏️"
-            active={tab === 'LANC'}
-            onClick={() => setTab('LANC')}
-          />
-          <MenuItem
-            label="Contas"
-            icon="🏦"
-            active={tab === 'CONTAS'}
-            onClick={() => setTab('CONTAS')}
-          />
-        </nav>
-        <div style={s.sidebarFooter}>
-          <span>{txs.length} lançamentos cadastrados</span>
-        </div>
-      </aside>
+      {/* Sidebar (fixa no desktop, flyout no mobile) */}
+      {(!isMobile || sidebarOpen) && (
+        <>
+          {isMobile && (
+            <div
+              style={s.backdrop}
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          <aside
+            style={{
+              ...s.sidebar,
+              ...(isMobile ? s.sidebarMobile : {}),
+            }}
+          >
+            <div style={s.logo}>
+              <div style={{ fontSize: 22, fontWeight: 800 }}>Gastos</div>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>controle financeiro</div>
+            </div>
+
+            <nav style={s.menu}>
+              <MenuItem
+                label="Dashboard"
+                icon="📊"
+                active={tab === 'DASH'}
+                onClick={() => {
+                  setTab('DASH');
+                  if (isMobile) setSidebarOpen(false);
+                }}
+              />
+              <MenuItem
+                label="Lançamentos"
+                icon="✏️"
+                active={tab === 'LANC'}
+                onClick={() => {
+                  setTab('LANC');
+                  if (isMobile) setSidebarOpen(false);
+                }}
+              />
+              <MenuItem
+                label="Contas"
+                icon="🏦"
+                active={tab === 'CONTAS'}
+                onClick={() => {
+                  setTab('CONTAS');
+                  if (isMobile) setSidebarOpen(false);
+                }}
+              />
+            </nav>
+
+            <div style={s.sidebarFooter}>
+              <span>{txs.length} lançamentos cadastrados</span>
+            </div>
+          </aside>
+        </>
+      )}
 
       {/* Conteúdo principal */}
-      <main style={s.page}>
+      <main style={{ ...s.page, ...(isMobile ? s.pageMobile : {}) }}>
         {/* Header */}
         <header style={s.nav}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>
-              {TAB_LABELS[tab]}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                style={s.burger}
+              >
+                ☰
+              </button>
+            )}
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>
+                {TAB_LABELS[tab]}
+              </div>
+              {tab === 'DASH' && (
+                <div style={s.headerSub}>
+                  Visão geral de {String(month).padStart(2, '0')}/{year}
+                </div>
+              )}
+              {tab === 'LANC' && (
+                <div style={s.headerSub}>
+                  Gerencie seus lançamentos do mês selecionado
+                </div>
+              )}
+              {tab === 'CONTAS' && (
+                <div style={s.headerSub}>
+                  Configure as contas usadas nos lançamentos
+                </div>
+              )}
             </div>
-            {tab === 'DASH' && (
-              <div style={s.headerSub}>
-                Visão geral de {String(month).padStart(2, '0')}/{year}
-              </div>
-            )}
-            {tab === 'LANC' && (
-              <div style={s.headerSub}>
-                Gerencie seus lançamentos do mês selecionado
-              </div>
-            )}
-            {tab === 'CONTAS' && (
-              <div style={s.headerSub}>
-                Configure as contas usadas nos lançamentos
-              </div>
-            )}
           </div>
         </header>
 
@@ -1028,7 +1088,6 @@ export default function Home() {
               <Stat title="Saldo" value={balance} bold />
             </section>
 
-            {/* Formulário para adicionar lançamentos */}
             <form onSubmit={submit} style={s.form}>
               <Field label="Data">
                 <input
@@ -1120,7 +1179,6 @@ export default function Home() {
               </div>
             </form>
 
-            {/* Lista de lançamentos */}
             {loading ? (
               <div style={{ padding: 12 }}>Carregando…</div>
             ) : (
@@ -1182,7 +1240,7 @@ export default function Home() {
           </>
         )}
 
-        {/* CONTAS */}
+        {/* Contas */}
         {tab === 'CONTAS' && (
           <section style={{ display: 'grid', gap: 12 }}>
             <div style={s.card}>
@@ -1362,7 +1420,6 @@ const s: Record<string, React.CSSProperties> = {
   app: {
     display: 'flex',
     minHeight: '100vh',
-    // deixa o fundo do app mais neutro pra sidebar colorida brilhar
     background: '#e5e7eb',
     fontFamily: 'Inter, system-ui, Segoe UI, Roboto, Arial',
   },
@@ -1371,13 +1428,26 @@ const s: Record<string, React.CSSProperties> = {
   sidebar: {
     width: 240,
     background:
-      'linear-gradient(180deg, #0369a1 0%, #0ea5e9 35%, #0f766e 100%)', // azul -> ciano -> verde
+      'linear-gradient(180deg, #0369a1 0%, #0ea5e9 35%, #0f766e 100%)',
     color: '#f9fafb',
     display: 'flex',
     flexDirection: 'column',
     padding: '18px 16px',
     boxSizing: 'border-box',
     boxShadow: '4px 0 24px rgba(15,23,42,0.25)',
+  },
+  sidebarMobile: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    zIndex: 40,
+  },
+  backdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(15,23,42,0.55)',
+    zIndex: 30,
   },
   logo: {
     marginBottom: 28,
@@ -1396,7 +1466,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 999,
     border: 'none',
     background: 'transparent',
-    color: 'rgba(241,245,249,0.92)', // texto mais clarinho
+    color: 'rgba(241,245,249,0.92)',
     cursor: 'pointer',
     fontSize: 14,
     textAlign: 'left',
@@ -1423,6 +1493,9 @@ const s: Record<string, React.CSSProperties> = {
     margin: '0 auto',
     boxSizing: 'border-box',
   },
+  pageMobile: {
+    padding: 16,
+  },
 
   /* HEADER */
   nav: {
@@ -1435,6 +1508,20 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
     color: '#6b7280',
     marginTop: 4,
+  },
+  burger: {
+    border: 'none',
+    background: '#0f172a',
+    color: '#f9fafb',
+    borderRadius: 999,
+    width: 36,
+    height: 36,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 18,
+    cursor: 'pointer',
+    boxShadow: '0 8px 18px rgba(15,23,42,0.35)',
   },
 
   /* CARDS */
