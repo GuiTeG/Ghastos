@@ -146,6 +146,12 @@ const pieOptions: ChartOptions<'pie'> = {
   cutout: '55%',
 };
 
+const TAB_LABELS: Record<'DASH' | 'LANC' | 'CONTAS', string> = {
+  DASH: 'Dashboard',
+  LANC: 'Lançamentos',
+  CONTAS: 'Contas',
+};
+
 export default function Home() {
   // Tab ativa: 'DASH', 'LANC', 'CONTAS'
   const [tab, setTab] = useState<'DASH' | 'LANC' | 'CONTAS'>('DASH');
@@ -537,7 +543,10 @@ export default function Home() {
   const recurringExpenses = useMemo(() => {
     if (!txs.length) return [] as { name: string; avg: number; count: number }[];
 
-    const map = new Map<string, { name: string; total: number; count: number }>();
+    const map = new Map<
+      string,
+      { name: string; total: number; count: number }
+    >();
     const thresholdDate = new Date();
     thresholdDate.setMonth(thresholdDate.getMonth() - 6); // últimos 6 meses
 
@@ -597,9 +606,7 @@ export default function Home() {
     );
   }
   if (mainPlaceName && totalExpenseAbs > 0) {
-    insights.push(
-      `Você gastou mais em "${mainPlaceName}" neste mês.`,
-    );
+    insights.push(`Você gastou mais em "${mainPlaceName}" neste mês.`);
   }
   if (monthHighlights.priciestDay) {
     const d = new Date(monthHighlights.priciestDay.date);
@@ -609,20 +616,25 @@ export default function Home() {
       )}, com ${BRL(monthHighlights.priciestDay.total)} em despesas.`,
     );
   }
-  if (prevComparison && (prevComparison.incomePct != null || prevComparison.expensePct != null)) {
+  if (
+    prevComparison &&
+    (prevComparison.incomePct != null || prevComparison.expensePct != null)
+  ) {
     const { prevMonth, prevYear, incomePct, expensePct } = prevComparison;
     if (incomePct != null) {
       insights.push(
-        `Suas receitas variaram ${incomePct >= 0 ? 'positivamente' : 'negativamente'} em ${incomePct.toFixed(
-          1,
-        )}% em relação a ${String(prevMonth).padStart(2, '0')}/${prevYear}.`,
+        `Suas receitas variaram ${
+          incomePct >= 0 ? 'positivamente' : 'negativamente'
+        } em ${incomePct.toFixed(1)}% em relação a ${String(
+          prevMonth,
+        ).padStart(2, '0')}/${prevYear}.`,
       );
     }
     if (expensePct != null) {
       insights.push(
-        `Suas despesas variaram ${expensePct >= 0 ? 'para cima' : 'para baixo'} em ${expensePct.toFixed(
-          1,
-        )}% em relação ao mês anterior.`,
+        `Suas despesas variaram ${
+          expensePct >= 0 ? 'para cima' : 'para baixo'
+        } em ${expensePct.toFixed(1)}% em relação ao mês anterior.`,
       );
     }
   }
@@ -712,411 +724,533 @@ export default function Home() {
   };
 
   return (
-    <main style={s.page}>
-      {/* NAV */}
-      <nav style={s.nav}>
-        <div style={{ fontSize: 28, fontWeight: 800 }}>Gastos</div>
-        <div style={s.tabs}>
-          <Tab
-            label="Dash"
+    <div style={s.app}>
+      {/* Sidebar */}
+      <aside style={s.sidebar}>
+        <div style={s.logo}>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>Gastos</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>controle financeiro</div>
+        </div>
+        <nav style={s.menu}>
+          <MenuItem
+            label="Dashboard"
+            icon="📊"
             active={tab === 'DASH'}
             onClick={() => setTab('DASH')}
           />
-          <Tab
+          <MenuItem
             label="Lançamentos"
+            icon="✏️"
             active={tab === 'LANC'}
             onClick={() => setTab('LANC')}
           />
-          <Tab
+          <MenuItem
             label="Contas"
+            icon="🏦"
             active={tab === 'CONTAS'}
             onClick={() => setTab('CONTAS')}
           />
+        </nav>
+        <div style={s.sidebarFooter}>
+          <span>{txs.length} lançamentos cadastrados</span>
         </div>
-        <div style={{ opacity: 0.6, fontSize: 12 }}>
-          {txs.length} lançamentos
-        </div>
-      </nav>
+      </aside>
 
-      {/* FILTROS */}
-      {(tab === 'DASH' || tab === 'LANC') && (
-        <section style={{ ...s.card, padding: 12, marginBottom: 12 }}>
-          <div style={s.filters}>
-            <div>
-              <label style={s.label}>Mês</label>
-              <select
-                value={month}
-                onChange={e => setMonth(+e.target.value)}
-                style={s.input}
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m}>
-                    {String(m).padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
+      {/* Conteúdo principal */}
+      <main style={s.page}>
+        {/* Header */}
+        <header style={s.nav}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>
+              {TAB_LABELS[tab]}
             </div>
-            <div>
-              <label style={s.label}>Ano</label>
-              <select
-                value={year}
-                onChange={e => setYear(+e.target.value)}
-                style={s.input}
-              >
-                {Array.from(new Set([now.getFullYear(), ...years]))
-                  .sort((a, b) => b - a)
-                  .map(y => (
-                    <option key={y} value={y}>
-                      {y}
+            {tab === 'DASH' && (
+              <div style={s.headerSub}>
+                Visão geral de {String(month).padStart(2, '0')}/{year}
+              </div>
+            )}
+            {tab === 'LANC' && (
+              <div style={s.headerSub}>
+                Gerencie seus lançamentos do mês selecionado
+              </div>
+            )}
+            {tab === 'CONTAS' && (
+              <div style={s.headerSub}>
+                Configure as contas usadas nos lançamentos
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* FILTROS */}
+        {(tab === 'DASH' || tab === 'LANC') && (
+          <section style={{ ...s.card, padding: 12, marginBottom: 12 }}>
+            <div style={s.filters}>
+              <div>
+                <label style={s.label}>Mês</label>
+                <select
+                  value={month}
+                  onChange={e => setMonth(+e.target.value)}
+                  style={s.input}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>
+                      {String(m).padStart(2, '0')}
                     </option>
                   ))}
-              </select>
-            </div>
-            <div>
-              <label style={s.label}>Tipo</label>
-              <select
-                value={typeFilter}
-                onChange={e => setTypeFilter(e.target.value as any)}
-                style={s.input}
-              >
-                <option value="ALL">Todos</option>
-                <option value="INCOME">Receitas</option>
-                <option value="EXPENSE">Despesas</option>
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={s.label}>Buscar</label>
-              <input
-                placeholder="Descrição..."
-                value={q}
-                onChange={e => setQ(e.target.value)}
-                style={s.input}
-              />
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Dash */}
-      {tab === 'DASH' && (
-        <>
-          <section style={s.cardsGrid}>
-            <Stat title="Receitas" value={income} />
-            <Stat title="Despesas" value={expense} negative />
-            <Stat title="Saldo" value={balance} bold />
-            <Stat title="Gasto médio diário" value={avgDailyExpense} />
-            <Stat
-              title="Lançamentos no mês"
-              value={totalCount}
-              format="integer"
-              suffix="lançamentos"
-            />
-            <Stat
-              title="Projeção de saldo no fim do mês"
-              value={projectedEndBalance}
-            />
-          </section>
-
-          <section style={s.chartsGrid}>
-            <div style={s.card}>
-              <h3 style={s.h3}>Saldo diário acumulado</h3>
-              {saldoLineData.labels?.length ? (
-                <div style={{ height: 260 }}>
-                  <LineChart data={saldoLineData} options={saldoLineOptions} />
-                </div>
-              ) : (
-                <Empty>Sem dados suficientes para calcular o saldo.</Empty>
-              )}
-            </div>
-
-            <div style={s.card}>
-              <h3 style={s.h3}>Receitas x Despesas (últimos 6 meses)</h3>
-              {monthlyBarData.labels?.length ? (
-                <div style={{ height: 260 }}>
-                  <BarChart data={monthlyBarData} options={barOptions} />
-                </div>
-              ) : (
-                <Empty>Sem dados para os últimos meses.</Empty>
-              )}
-            </div>
-
-            <div style={s.card}>
-              <h3 style={s.h3}>Top categorias de despesa (mês)</h3>
-              {topCategoriesData.labels?.length ? (
-                <div style={{ height: 260 }}>
-                  <BarChart
-                    data={topCategoriesData}
-                    options={horizontalBarOptions}
-                  />
-                </div>
-              ) : (
-                <Empty>Sem despesas no período.</Empty>
-              )}
-            </div>
-
-            <div style={s.card}>
-              <h3 style={s.h3}>Locais onde mais gastou (mês)</h3>
-              {topPlacesData.labels?.length ? (
-                <div style={{ height: 260 }}>
-                  <BarChart
-                    data={topPlacesData}
-                    options={horizontalBarOptions}
-                  />
-                </div>
-              ) : (
-                <Empty>Sem despesas no período.</Empty>
-              )}
-            </div>
-
-            <div style={s.card}>
-              <h3 style={s.h3}>Gastos por categoria</h3>
-              {pieData.labels?.length ? (
-                <div style={{ height: 260 }}>
-                  <PieChart data={pieData} options={pieOptions} />
-                </div>
-              ) : (
-                <Empty>Sem dados de despesa no período.</Empty>
-              )}
-            </div>
-
-            <div style={s.card}>
-              <h3 style={s.h3}>Despesas por dia da semana</h3>
-              {weekdayData.labels?.length ? (
-                <div style={{ height: 260 }}>
-                  <BarChart data={weekdayData} options={barOptions} />
-                </div>
-              ) : (
-                <Empty>Sem dados para o período.</Empty>
-              )}
-            </div>
-          </section>
-
-          {/* Destaques + Insights */}
-          <section style={s.highlightsGrid}>
-            <div style={s.card}>
-              <h3 style={s.h3}>Destaques do mês</h3>
-              {monthHighlights.priciestDay ? (
-                <>
-                  <p style={s.p}>
-                    <strong>Dia mais caro:</strong>{' '}
-                    {new Date(
-                      monthHighlights.priciestDay.date,
-                    ).toLocaleDateString('pt-BR')}{' '}
-                    ({BRL(monthHighlights.priciestDay.total)})
-                  </p>
-                  <p style={s.p}>
-                    <strong>Maiores gastos individuais:</strong>
-                  </p>
-                  <ul style={s.ul}>
-                    {monthHighlights.topExpenses.map(tx => (
-                      <li key={tx.id} style={s.li}>
-                        {new Date(tx.date).toLocaleDateString('pt-BR')} —{' '}
-                        <strong>{BRL(Math.abs(Number(tx.amount)))}</strong>{' '}
-                        {tx.description && `em "${tx.description}"`}{' '}
-                        {tx.category?.name && (
-                          <span style={{ color: '#6b7280' }}>
-                            ({tx.category.name})
-                          </span>
-                        )}
-                      </li>
+                </select>
+              </div>
+              <div>
+                <label style={s.label}>Ano</label>
+                <select
+                  value={year}
+                  onChange={e => setYear(+e.target.value)}
+                  style={s.input}
+                >
+                  {Array.from(new Set([now.getFullYear(), ...years]))
+                    .sort((a, b) => b - a)
+                    .map(y => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
                     ))}
-                  </ul>
-                </>
-              ) : (
-                <Empty>Sem despesas no período.</Empty>
-              )}
-            </div>
-
-            <div style={s.card}>
-              <h3 style={s.h3}>Resumo do mês</h3>
-              <ul style={s.ul}>
-                {insights.map((line, idx) => (
-                  <li key={idx} style={s.li}>
-                    {line}
-                  </li>
-                ))}
-              </ul>
+                </select>
+              </div>
+              <div>
+                <label style={s.label}>Tipo</label>
+                <select
+                  value={typeFilter}
+                  onChange={e => setTypeFilter(e.target.value as any)}
+                  style={s.input}
+                >
+                  <option value="ALL">Todos</option>
+                  <option value="INCOME">Receitas</option>
+                  <option value="EXPENSE">Despesas</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={s.label}>Buscar</label>
+                <input
+                  placeholder="Descrição..."
+                  value={q}
+                  onChange={e => setQ(e.target.value)}
+                  style={s.input}
+                />
+              </div>
             </div>
           </section>
+        )}
 
-          {/* Assinaturas / recorrentes */}
-          <section style={{ marginTop: 16 }}>
-            <div style={s.card}>
-              <h3 style={s.h3}>Assinaturas / gastos recorrentes</h3>
-              {recurringExpenses.length ? (
+        {/* Dash */}
+        {tab === 'DASH' && (
+          <>
+            <section style={s.cardsGrid}>
+              <Stat title="Receitas" value={income} />
+              <Stat title="Despesas" value={expense} negative />
+              <Stat title="Saldo" value={balance} bold />
+              <Stat title="Gasto médio diário" value={avgDailyExpense} />
+              <Stat
+                title="Lançamentos no mês"
+                value={totalCount}
+                format="integer"
+                suffix="lançamentos"
+              />
+              <Stat
+                title="Projeção de saldo no fim do mês"
+                value={projectedEndBalance}
+              />
+            </section>
+
+            <section style={s.chartsGrid}>
+              <div style={s.card}>
+                <h3 style={s.h3}>Saldo diário acumulado</h3>
+                {saldoLineData.labels?.length ? (
+                  <div style={{ height: 260 }}>
+                    <LineChart data={saldoLineData} options={saldoLineOptions} />
+                  </div>
+                ) : (
+                  <Empty>Sem dados suficientes para calcular o saldo.</Empty>
+                )}
+              </div>
+
+              <div style={s.card}>
+                <h3 style={s.h3}>Receitas x Despesas (últimos 6 meses)</h3>
+                {monthlyBarData.labels?.length ? (
+                  <div style={{ height: 260 }}>
+                    <BarChart data={monthlyBarData} options={barOptions} />
+                  </div>
+                ) : (
+                  <Empty>Sem dados para os últimos meses.</Empty>
+                )}
+              </div>
+
+              <div style={s.card}>
+                <h3 style={s.h3}>Top categorias de despesa (mês)</h3>
+                {topCategoriesData.labels?.length ? (
+                  <div style={{ height: 260 }}>
+                    <BarChart
+                      data={topCategoriesData}
+                      options={horizontalBarOptions}
+                    />
+                  </div>
+                ) : (
+                  <Empty>Sem despesas no período.</Empty>
+                )}
+              </div>
+
+              <div style={s.card}>
+                <h3 style={s.h3}>Locais onde mais gastou (mês)</h3>
+                {topPlacesData.labels?.length ? (
+                  <div style={{ height: 260 }}>
+                    <BarChart
+                      data={topPlacesData}
+                      options={horizontalBarOptions}
+                    />
+                  </div>
+                ) : (
+                  <Empty>Sem despesas no período.</Empty>
+                )}
+              </div>
+
+              <div style={s.card}>
+                <h3 style={s.h3}>Gastos por categoria</h3>
+                {pieData.labels?.length ? (
+                  <div style={{ height: 260 }}>
+                    <PieChart data={pieData} options={pieOptions} />
+                  </div>
+                ) : (
+                  <Empty>Sem dados de despesa no período.</Empty>
+                )}
+              </div>
+
+              <div style={s.card}>
+                <h3 style={s.h3}>Despesas por dia da semana</h3>
+                {weekdayData.labels?.length ? (
+                  <div style={{ height: 260 }}>
+                    <BarChart data={weekdayData} options={barOptions} />
+                  </div>
+                ) : (
+                  <Empty>Sem dados para o período.</Empty>
+                )}
+              </div>
+            </section>
+
+            {/* Destaques + Insights */}
+            <section style={s.highlightsGrid}>
+              <div style={s.card}>
+                <h3 style={s.h3}>Destaques do mês</h3>
+                {monthHighlights.priciestDay ? (
+                  <>
+                    <p style={s.p}>
+                      <strong>Dia mais caro:</strong>{' '}
+                      {new Date(
+                        monthHighlights.priciestDay.date,
+                      ).toLocaleDateString('pt-BR')}{' '}
+                      ({BRL(monthHighlights.priciestDay.total)})
+                    </p>
+                    <p style={s.p}>
+                      <strong>Maiores gastos individuais:</strong>
+                    </p>
+                    <ul style={s.ul}>
+                      {monthHighlights.topExpenses.map(tx => (
+                        <li key={tx.id} style={s.li}>
+                          {new Date(tx.date).toLocaleDateString('pt-BR')} —{' '}
+                          <strong>{BRL(Math.abs(Number(tx.amount)))}</strong>{' '}
+                          {tx.description && `em "${tx.description}"`}{' '}
+                          {tx.category?.name && (
+                            <span style={{ color: '#6b7280' }}>
+                              ({tx.category.name})
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <Empty>Sem despesas no período.</Empty>
+                )}
+              </div>
+
+              <div style={s.card}>
+                <h3 style={s.h3}>Resumo do mês</h3>
+                <ul style={s.ul}>
+                  {insights.map((line, idx) => (
+                    <li key={idx} style={s.li}>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+
+            {/* Assinaturas / recorrentes */}
+            <section style={{ marginTop: 16 }}>
+              <div style={s.card}>
+                <h3 style={s.h3}>Assinaturas / gastos recorrentes</h3>
+                {recurringExpenses.length ? (
+                  <table style={s.table}>
+                    <thead>
+                      <tr>
+                        <th>Descrição</th>
+                        <th style={{ textAlign: 'right' }}>Valor médio</th>
+                        <th style={{ textAlign: 'right' }}>Ocorrências</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recurringExpenses.map((r, idx) => (
+                        <tr key={idx}>
+                          <td>{r.name}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            {BRL(r.avg)}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{r.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <Empty>
+                    Não identificamos gastos recorrentes (3+ vezes) nos últimos
+                    meses.
+                  </Empty>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* Lançamentos */}
+        {tab === 'LANC' && (
+          <>
+            <section style={s.cardsGrid}>
+              <Stat title="Receitas" value={income} />
+              <Stat title="Despesas" value={expense} negative />
+              <Stat title="Saldo" value={balance} bold />
+            </section>
+
+            {/* Formulário para adicionar lançamentos */}
+            <form onSubmit={submit} style={s.form}>
+              <Field label="Data">
+                <input
+                  type="date"
+                  value={form.date}
+                  style={s.input}
+                  onChange={e =>
+                    setForm({ ...form, date: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Descrição" grow>
+                <input
+                  ref={descRef}
+                  value={form.description}
+                  style={s.input}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      description: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Valor (R$)">
+                <input
+                  inputMode="decimal"
+                  value={form.amount}
+                  placeholder="0,00"
+                  style={s.input}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      amount: e.target.value
+                        .replace(/[^\d,.-]/g, '')
+                        .replace(/\.(?=.*\.)/g, ''),
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Tipo">
+                <select
+                  value={form.type}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      type: e.target.value as any,
+                    })
+                  }
+                  style={s.input}
+                >
+                  <option value="EXPENSE">Despesa</option>
+                  <option value="INCOME">Receita</option>
+                </select>
+              </Field>
+              <Field label="Conta">
+                <input
+                  value={form.account}
+                  style={s.input}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      account: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Categoria">
+                <input
+                  value={form.category}
+                  style={s.input}
+                  onChange={e =>
+                    setForm({
+                      ...form,
+                      category: e.target.value,
+                    })
+                  }
+                />
+              </Field>
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  textAlign: 'right',
+                }}
+              >
+                <button disabled={posting} style={s.button}>
+                  {posting ? 'Adicionando…' : 'Adicionar'}
+                </button>
+              </div>
+            </form>
+
+            {/* Lista de lançamentos */}
+            {loading ? (
+              <div style={{ padding: 12 }}>Carregando…</div>
+            ) : (
+              <div style={s.card}>
                 <table style={s.table}>
                   <thead>
                     <tr>
+                      <th>Data</th>
                       <th>Descrição</th>
-                      <th style={{ textAlign: 'right' }}>Valor médio</th>
-                      <th style={{ textAlign: 'right' }}>Ocorrências</th>
+                      <th>Categoria</th>
+                      <th>Conta</th>
+                      <th style={{ textAlign: 'right' }}>Valor</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {recurringExpenses.map((r, idx) => (
-                      <tr key={idx}>
-                        <td>{r.name}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {BRL(r.avg)}
+                    {filtered.map((t, i) => (
+                      <tr
+                        key={t.id}
+                        style={{
+                          background: i % 2 ? '#f3f4f6' : undefined,
+                        }}
+                      >
+                        <td>{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                        <td>{t.description}</td>
+                        <td>{t.category?.name}</td>
+                        <td>{t.account?.name}</td>
+                        <td
+                          style={{
+                            textAlign: 'right',
+                            color:
+                              t.type === 'EXPENSE' ? '#ef4444' : '#16a34a',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {BRL(Number(t.amount))}
                         </td>
-                        <td style={{ textAlign: 'right' }}>{r.count}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            onClick={() => delTx(t.id)}
+                            style={s.btnGhost}
+                          >
+                            Excluir
+                          </button>
+                        </td>
                       </tr>
                     ))}
+                    {!filtered.length && (
+                      <tr>
+                        <td colSpan={6}>
+                          <Empty>Nenhum lançamento no período.</Empty>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
-              ) : (
-                <Empty>
-                  Não identificamos gastos recorrentes (3+ vezes) nos
-                  últimos meses.
-                </Empty>
-              )}
-            </div>
-          </section>
-        </>
-      )}
+              </div>
+            )}
+          </>
+        )}
 
-      {/* Lançamentos */}
-      {tab === 'LANC' && (
-        <>
-          <section style={s.cardsGrid}>
-            <Stat title="Receitas" value={income} />
-            <Stat title="Despesas" value={expense} negative />
-            <Stat title="Saldo" value={balance} bold />
-          </section>
-
-          {/* Formulário para adicionar lançamentos */}
-          <form onSubmit={submit} style={s.form}>
-            <Field label="Data">
-              <input
-                type="date"
-                value={form.date}
-                style={s.input}
-                onChange={e =>
-                  setForm({ ...form, date: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Descrição" grow>
-              <input
-                ref={descRef}
-                value={form.description}
-                style={s.input}
-                onChange={e =>
-                  setForm({
-                    ...form,
-                    description: e.target.value,
-                  })
-                }
-              />
-            </Field>
-            <Field label="Valor (R$)">
-              <input
-                inputMode="decimal"
-                value={form.amount}
-                placeholder="0,00"
-                style={s.input}
-                onChange={e =>
-                  setForm({
-                    ...form,
-                    amount: e.target.value
-                      .replace(/[^\d,.-]/g, '')
-                      .replace(/\.(?=.*\.)/g, ''),
-                  })
-                }
-              />
-            </Field>
-            <Field label="Tipo">
-              <select
-                value={form.type}
-                onChange={e =>
-                  setForm({
-                    ...form,
-                    type: e.target.value as any,
-                  })
-                }
-                style={s.input}
-              >
-                <option value="EXPENSE">Despesa</option>
-                <option value="INCOME">Receita</option>
-              </select>
-            </Field>
-            <Field label="Conta">
-              <input
-                value={form.account}
-                style={s.input}
-                onChange={e =>
-                  setForm({
-                    ...form,
-                    account: e.target.value,
-                  })
-                }
-              />
-            </Field>
-            <Field label="Categoria">
-              <input
-                value={form.category}
-                style={s.input}
-                onChange={e =>
-                  setForm({
-                    ...form,
-                    category: e.target.value,
-                  })
-                }
-              />
-            </Field>
-            <div
-              style={{
-                gridColumn: '1 / -1',
-                textAlign: 'right',
-              }}
-            >
-              <button disabled={posting} style={s.button}>
-                {posting ? 'Adicionando…' : 'Adicionar'}
-              </button>
-            </div>
-          </form>
-
-          {/* Lista de lançamentos */}
-          {loading ? (
-            <div style={{ padding: 12 }}>Carregando…</div>
-          ) : (
+        {/* CONTAS */}
+        {tab === 'CONTAS' && (
+          <section style={{ display: 'grid', gap: 12 }}>
             <div style={s.card}>
+              <h3 style={s.h3}>Nova conta</h3>
+              <form
+                onSubmit={submitAcc}
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'flex-end',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <Field label="Nome" grow>
+                  <input
+                    value={accForm.name}
+                    onChange={e =>
+                      setAccForm(a => ({
+                        ...a,
+                        name: e.target.value,
+                      }))
+                    }
+                    style={s.input}
+                  />
+                </Field>
+                <Field label="Tipo">
+                  <select
+                    value={accForm.type}
+                    onChange={e =>
+                      setAccForm(a => ({
+                        ...a,
+                        type: e.target.value,
+                      }))
+                    }
+                    style={s.input}
+                  >
+                    <option>Conta Corrente</option>
+                    <option>Cartão</option>
+                    <option>Poupança</option>
+                    <option>Outros</option>
+                  </select>
+                </Field>
+                <div>
+                  <button className="btn" style={s.button}>
+                    Criar
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div style={s.card}>
+              <h3 style={s.h3}>Minhas contas</h3>
               <table style={s.table}>
                 <thead>
                   <tr>
-                    <th>Data</th>
-                    <th>Descrição</th>
-                    <th>Categoria</th>
-                    <th>Conta</th>
-                    <th style={{ textAlign: 'right' }}>Valor</th>
-                    <th></th>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th style={{ textAlign: 'right' }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((t, i) => (
-                    <tr
-                      key={t.id}
-                      style={{
-                        background: i % 2 ? '#fafafa' : undefined,
-                      }}
-                    >
-                      <td>{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                      <td>{t.description}</td>
-                      <td>{t.category?.name}</td>
-                      <td>{t.account?.name}</td>
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          color:
-                            t.type === 'EXPENSE' ? '#ef4444' : '#16a34a',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {BRL(Number(t.amount))}
-                      </td>
+                  {accounts.map(a => (
+                    <tr key={a.id}>
+                      <td>{a.name}</td>
+                      <td>{a.type}</td>
                       <td style={{ textAlign: 'right' }}>
                         <button
-                          onClick={() => delTx(t.id)}
+                          onClick={() => delAcc(a.id)}
                           style={s.btnGhost}
                         >
                           Excluir
@@ -1124,125 +1258,39 @@ export default function Home() {
                       </td>
                     </tr>
                   ))}
-                  {!filtered.length && (
+                  {!accounts.length && (
                     <tr>
-                      <td colSpan={6}>
-                        <Empty>Nenhum lançamento no período.</Empty>
+                      <td colSpan={3}>
+                        <Empty>Nenhuma conta cadastrada.</Empty>
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          )}
-        </>
-      )}
+          </section>
+        )}
 
-      {/* CONTAS */}
-      {tab === 'CONTAS' && (
-        <section style={{ display: 'grid', gap: 12 }}>
-          <div style={s.card}>
-            <h3 style={s.h3}>Nova conta</h3>
-            <form
-              onSubmit={submitAcc}
-              style={{
-                display: 'flex',
-                gap: 8,
-                alignItems: 'end',
-                flexWrap: 'wrap',
-              }}
-            >
-              <Field label="Nome" grow>
-                <input
-                  value={accForm.name}
-                  onChange={e =>
-                    setAccForm(a => ({
-                      ...a,
-                      name: e.target.value,
-                    }))
-                  }
-                  style={s.input}
-                />
-              </Field>
-              <Field label="Tipo">
-                <select
-                  value={accForm.type}
-                  onChange={e =>
-                    setAccForm(a => ({
-                      ...a,
-                      type: e.target.value,
-                    }))
-                  }
-                  style={s.input}
-                >
-                  <option>Conta Corrente</option>
-                  <option>Cartão</option>
-                  <option>Poupança</option>
-                  <option>Outros</option>
-                </select>
-              </Field>
-              <div>
-                <button className="btn" style={s.button}>
-                  Criar
-                </button>
-              </div>
-            </form>
+        {toast && (
+          <div style={s.toast} onAnimationEnd={() => setToast(null)}>
+            {toast}
           </div>
-
-          <div style={s.card}>
-            <h3 style={s.h3}>Minhas contas</h3>
-            <table style={s.table}>
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Tipo</th>
-                  <th style={{ textAlign: 'right' }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {accounts.map(a => (
-                  <tr key={a.id}>
-                    <td>{a.name}</td>
-                    <td>{a.type}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        onClick={() => delAcc(a.id)}
-                        style={s.btnGhost}
-                      >
-                        Excluir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!accounts.length && (
-                  <tr>
-                    <td colSpan={3}>
-                      <Empty>Nenhuma conta cadastrada.</Empty>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {toast && (
-        <div style={s.toast} onAnimationEnd={() => setToast(null)}>
-          {toast}
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </div>
   );
 }
 
 /* UI helpers */
-function Tab({
+
+function MenuItem({
   label,
+  icon,
   active,
   onClick,
 }: {
   label: string;
+  icon?: string;
   active?: boolean;
   onClick: () => void;
 }) {
@@ -1250,15 +1298,12 @@ function Tab({
     <button
       onClick={onClick}
       style={{
-        padding: '8px 14px',
-        borderRadius: 12,
-        border: '1px solid #e5e7eb',
-        background: active ? '#111827' : '#fff',
-        color: active ? '#fff' : '#111',
-        cursor: 'pointer',
+        ...s.menuItem,
+        ...(active ? s.menuItemActive : {}),
       }}
     >
-      {label}
+      {icon && <span style={{ fontSize: 16 }}>{icon}</span>}
+      <span>{label}</span>
     </button>
   );
 }
@@ -1314,59 +1359,124 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 /* styles */
 const s: Record<string, React.CSSProperties> = {
-  page: {
-    padding: 24,
-    maxWidth: 1200,
-    margin: '0 auto',
+  app: {
+    display: 'flex',
+    minHeight: '100vh',
+    // deixa o fundo do app mais neutro pra sidebar colorida brilhar
+    background: '#e5e7eb',
     fontFamily: 'Inter, system-ui, Segoe UI, Roboto, Arial',
-    background: '#f4f7fb',
   },
+
+  /* SIDEBAR */
+  sidebar: {
+    width: 240,
+    background:
+      'linear-gradient(180deg, #0369a1 0%, #0ea5e9 35%, #0f766e 100%)', // azul -> ciano -> verde
+    color: '#f9fafb',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '18px 16px',
+    boxSizing: 'border-box',
+    boxShadow: '4px 0 24px rgba(15,23,42,0.25)',
+  },
+  logo: {
+    marginBottom: 28,
+  },
+  menu: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    flex: 1,
+  },
+  menuItem: {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 999,
+    border: 'none',
+    background: 'transparent',
+    color: 'rgba(241,245,249,0.92)', // texto mais clarinho
+    cursor: 'pointer',
+    fontSize: 14,
+    textAlign: 'left',
+    gap: 8,
+  },
+  menuItemActive: {
+    background: 'rgba(15,23,42,0.24)',
+    boxShadow: '0 0 0 1px rgba(15,23,42,0.28), 0 10px 22px rgba(15,23,42,0.35)',
+    color: '#f9fafb',
+  },
+  sidebarFooter: {
+    marginTop: 18,
+    borderTop: '1px solid rgba(15,23,42,0.32)',
+    paddingTop: 10,
+    fontSize: 12,
+    color: 'rgba(226,232,240,0.9)',
+  },
+
+  /* CONTEÚDO PRINCIPAL */
+  page: {
+    flex: 1,
+    padding: 24,
+    maxWidth: 1300,
+    margin: '0 auto',
+    boxSizing: 'border-box',
+  },
+
+  /* HEADER */
   nav: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    padding: '10px 20px',
-    background: '#fff',
-    boxShadow: '0 2px 6px rgba(0,0,0,.08)',
-    borderRadius: 12,
+    marginBottom: 12,
   },
-  tabs: { display: 'flex', gap: 12 },
+  headerSub: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+
+  /* CARDS */
   card: {
+    borderRadius: 18,
+    padding: 18,
+    background: '#f9fafb',
     border: '1px solid #e5e7eb',
-    borderRadius: 12,
-    padding: 20,
-    background: '#fff',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+    boxShadow:
+      '0 18px 45px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.01)',
   },
   cardsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
     gap: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   chartsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
-    gap: 20,
-    marginTop: 16,
+    gap: 18,
+    marginTop: 14,
   },
   highlightsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
-    gap: 16,
-    marginTop: 16,
+    gap: 18,
+    marginTop: 14,
   },
+
+  /* FORM / FILTROS */
   form: {
     display: 'flex',
     gap: 16,
     flexWrap: 'wrap',
-    alignItems: 'end',
+    alignItems: 'flex-end',
     margin: '12px 0',
-    border: '1px solid #e5e7eb',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 20,
-    background: '#fff',
+    background: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 10px 30px rgba(15,23,42,0.04)',
   },
   filters: {
     display: 'flex',
@@ -1375,59 +1485,75 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
   },
   input: {
-    border: '1px solid #e5e7eb',
-    borderRadius: 10,
-    padding: '10px 12px',
+    borderRadius: 999,
+    padding: '10px 14px',
     width: '100%',
     fontSize: 14,
     outline: 'none',
-    background: '#fff',
+    background: '#f9fafb',
     boxSizing: 'border-box',
+    border: '1px solid #e5e7eb',
   },
+
+  /* BOTÕES */
   button: {
-    background: '#111827',
+    background: 'linear-gradient(90deg, #0ea5e9, #14b8a6)',
     color: '#fff',
     border: 0,
-    borderRadius: 10,
-    padding: '12px 24px',
+    borderRadius: 999,
+    padding: '10px 22px',
     cursor: 'pointer',
     fontSize: 14,
+    fontWeight: 600,
+    letterSpacing: 0.2,
   },
   btnGhost: {
-    background: '#fff',
+    background: '#f9fafb',
     border: '1px solid #e5e7eb',
-    padding: '8px 16px',
-    borderRadius: 10,
+    padding: '7px 16px',
+    borderRadius: 999,
     cursor: 'pointer',
     fontSize: 13,
+    color: '#374151',
   },
+
+  /* TABELA */
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     boxSizing: 'border-box',
     fontSize: 14,
   },
+
   h3: {
-    margin: '0 0 16px 0',
+    margin: '0 0 14px 0',
     fontWeight: 600,
-    color: '#333',
+    color: '#111827',
+    fontSize: 15,
   },
   label: {
     display: 'block',
-    fontSize: 14,
-    color: '#667085',
-    marginBottom: 6,
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
+
+  /* TOAST */
   toast: {
     position: 'fixed',
     right: 20,
     bottom: 20,
-    background: '#16a34a',
+    background: '#22c55e',
     color: '#fff',
-    padding: '12px 20px',
-    borderRadius: 10,
+    padding: '10px 18px',
+    borderRadius: 999,
     fontWeight: 600,
+    boxShadow: '0 20px 40px rgba(22,163,74,0.35)',
+    fontSize: 13,
   },
+
   ul: {
     margin: 0,
     paddingLeft: 18,
